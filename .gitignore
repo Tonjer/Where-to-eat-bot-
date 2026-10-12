@@ -32,7 +32,6 @@ build/
 # IDE files (IntelliJ IDEA, Eclipse, NetBeans)
 .idea/
 *.iml
-*.iml
 *.iws
 *.ipr
 .project
@@ -44,3 +43,4 @@ private/
 # Operating system files
 .DS_Store
 Thumbs.db
+out/
