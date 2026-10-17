@@ -2,9 +2,6 @@ package bot.wheretoeat.ui;
 
 import java.util.List;
 
-/**
- * Отдельный класс для вывода меню (в ConsoleApp не смешивается цикл опроса и печать).
- */
 public class MenuPrinter {
 
     public void printWelcome() {
