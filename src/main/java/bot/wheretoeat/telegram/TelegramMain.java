@@ -8,11 +8,11 @@ import org.telegram.telegrambots.updatesreceivers.DefaultBotSession;
 public class TelegramMain {
 
     public static void main(String[] args) {
-        String botToken = System.getenv("Where_ToEat_bot");
+        String botToken = System.getenv("Telegram_Bot_Token");
 
         if (botToken == null || botToken.isBlank()) {
             System.err.println(
-                    "Не задана переменная окружения Where_ToEat_bot"
+                    "Не задана переменная окружения Telegram_Bot_Token"
             );
             return;
         }
