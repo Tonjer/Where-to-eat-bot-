@@ -1,4 +1,4 @@
-package bot.wheretoeat.service;
+package bot.wheretoeat.filter;
 
 import bot.wheretoeat.model.Restaurant;
 

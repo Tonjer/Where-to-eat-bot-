@@ -2,7 +2,7 @@
 package bot.wheretoeat.telegram;
 
 import bot.wheretoeat.model.Restaurant;
-import bot.wheretoeat.service.RestaurantRepository;
+import bot.wheretoeat.repository.RestaurantRepository;
 
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;

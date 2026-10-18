@@ -1,4 +1,4 @@
-package bot.wheretoeat.model;
+package bot.wheretoeat.util;
 
 public class StringUtilities {
     private StringUtilities() {

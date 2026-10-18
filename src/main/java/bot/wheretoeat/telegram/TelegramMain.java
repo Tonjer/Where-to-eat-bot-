@@ -1,8 +1,8 @@
 
 package bot.wheretoeat.telegram;
 
-import bot.wheretoeat.service.RestaurantRepository;
-import bot.wheretoeat.service.RestaurantRepositoryImpl;
+import bot.wheretoeat.repository.RestaurantRepository;
+import bot.wheretoeat.repository.RestaurantRepositoryImpl;
 
 import org.telegram.telegrambots.meta.TelegramBotsApi;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
