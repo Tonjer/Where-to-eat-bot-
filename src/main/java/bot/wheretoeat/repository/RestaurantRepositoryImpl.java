@@ -1,5 +1,6 @@
-package bot.wheretoeat.service;
+package bot.wheretoeat.repository;
 
+import bot.wheretoeat.filter.Filter;
 import bot.wheretoeat.model.Restaurant;
 
 import com.fasterxml.jackson.core.type.TypeReference;
