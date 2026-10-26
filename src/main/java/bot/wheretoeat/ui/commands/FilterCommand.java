@@ -2,11 +2,12 @@
 package bot.wheretoeat.ui.commands;
 
 import bot.wheretoeat.service.RestaurantService;
+import bot.wheretoeat.service.commands.Command;
 import bot.wheretoeat.ui.ConsoleReader;
 import bot.wheretoeat.ui.FilterMenu;
 import bot.wheretoeat.ui.MenuPrinter;
 
-public class FilterCommand implements Command {
+public class FilterCommand implements ConsoleCommand {
 
     private final FilterMenu filterMenu;
 

@@ -8,6 +8,9 @@ import bot.wheretoeat.filter.Filter;
 import bot.wheretoeat.filter.PriceFilter;
 import bot.wheretoeat.model.Restaurant;
 import bot.wheretoeat.service.RestaurantService;
+import bot.wheretoeat.service.commands.GetAllCuisinesCommand;
+import bot.wheretoeat.service.commands.GetAllDishesCommand;
+import bot.wheretoeat.service.commands.FindRestaurantsByFilterCommand;
 
 import java.util.HashMap;
 import java.util.List;
@@ -60,7 +63,7 @@ public class TelegramFilterHandler {
             state.pendingAction = "cuisine";
             return getNumberedList(
                     "🌍 Выбери кухню, отправив её номер:",
-                    service.getAllCuisines()
+                    new GetAllCuisinesCommand(service).execute()
             );
         }
 
@@ -68,7 +71,7 @@ public class TelegramFilterHandler {
             state.pendingAction = "dish";
             return getNumberedList(
                     "🍽 Выбери блюдо, отправив его номер:",
-                    service.getAllDishes()
+                    new GetAllDishesCommand(service).execute()
             );
         }
 
@@ -95,7 +98,7 @@ public class TelegramFilterHandler {
             return selectFromList(
                     state,
                     input,
-                    service.getAllCuisines(),
+                    new GetAllCuisinesCommand(service).execute(),
                     "cuisine"
             );
         }
@@ -104,7 +107,7 @@ public class TelegramFilterHandler {
             return selectFromList(
                     state,
                     input,
-                    service.getAllDishes(),
+                    new GetAllDishesCommand(service).execute(),
                     "dish"
             );
         }
@@ -247,7 +250,7 @@ public class TelegramFilterHandler {
                 new PriceFilter(state.minCheck, state.maxCheck)
         );
 
-        List<Restaurant> found = service.findByFilter(filter);
+        List<Restaurant> found = new FindRestaurantsByFilterCommand(service, filter).execute();
 
         String resultMessage = restaurantHandler.formatRestaurants(
                 found,

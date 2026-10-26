@@ -8,6 +8,9 @@ import bot.wheretoeat.filter.Filter;
 import bot.wheretoeat.filter.PriceFilter;
 import bot.wheretoeat.model.Restaurant;
 import bot.wheretoeat.service.RestaurantService;
+import bot.wheretoeat.service.commands.GetAllCuisinesCommand;
+import bot.wheretoeat.service.commands.GetAllDishesCommand;
+import bot.wheretoeat.service.commands.FindRestaurantsByFilterCommand;
 
 import java.util.List;
 
@@ -54,7 +57,7 @@ public class FilterMenu {
     }
 
     private void chooseDish() {
-        List<String> dishes = service.getAllDishes();
+        List<String> dishes = new GetAllDishesCommand(service).execute();
         int choice = chooseFromList(dishes, "🍽 Выберите тип еды");
 
         if (choice > 0) {
@@ -64,7 +67,7 @@ public class FilterMenu {
     }
 
     private void chooseCuisine() {
-        List<String> cuisines = service.getAllCuisines();
+        List<String> cuisines = new GetAllCuisinesCommand(service).execute();
         int choice = chooseFromList(cuisines, "🌍 Выберите кухню");
 
         if (choice > 0) {
@@ -198,7 +201,7 @@ public class FilterMenu {
                 new PriceFilter(minCheck, maxCheck)
         );
 
-        List<Restaurant> found = service.findByFilter(filter);
+        List<Restaurant> found = new FindRestaurantsByFilterCommand(service, filter).execute();
 
         printer.printResultsHeader();
         printCurrentFilters();

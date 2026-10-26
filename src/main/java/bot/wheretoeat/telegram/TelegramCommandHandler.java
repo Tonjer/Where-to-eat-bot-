@@ -1,33 +1,33 @@
-
 package bot.wheretoeat.telegram;
 
-public class TelegramCommandHandler {
+import java.util.HashMap;
+import java.util.Map;
 
-    private final TelegramHelpHandler helpHandler;
-    private final TelegramRestaurantHandler restaurantHandler;
+public class TelegramCommandHandler {
+    private final Map<String, TelegramCommand> commands = new HashMap<>();
     private final TelegramFilterHandler filterHandler;
 
-    public TelegramCommandHandler(
-            TelegramHelpHandler helpHandler,
-            TelegramRestaurantHandler restaurantHandler,
-            TelegramFilterHandler filterHandler
-    ) {
-        this.helpHandler = helpHandler;
-        this.restaurantHandler = restaurantHandler;
+    public TelegramCommandHandler(TelegramHelpHandler helpHandler, TelegramRestaurantHandler restaurantHandler, TelegramFilterHandler filterHandler) {
         this.filterHandler = filterHandler;
+        commands.put("/start", (chatId, text) -> helpHandler.getStartMessage());
+        commands.put("/help", (chatId, text) -> helpHandler.getHelpMessage());
+        commands.put("/all", (chatId, text) -> restaurantHandler.getAllRestaurantsMessage());
+
+        commands.put("/filters", filterHandler::handleMessage);
+        commands.put("/cuisine", filterHandler::handleMessage);
+        commands.put("/dish", filterHandler::handleMessage);
+        commands.put("/price", filterHandler::handleMessage);
+        commands.put("/search", filterHandler::handleMessage);
+        commands.put("/reset", filterHandler::handleMessage);
+        commands.put("/cancel", filterHandler::handleMessage);
     }
 
     public String handleMessage(long chatId, String text) {
         if (text == null || text.isBlank()) {
-            return helpHandler.getUnknownCommandMessage();
+            return "Напиши /help для просмотра команд.";
         }
 
-        String command = text.trim();
-        int spaceIndex = command.indexOf(' ');
-
-        if (spaceIndex >= 0) {
-            command = command.substring(0, spaceIndex);
-        }
+        String command = text.trim().split("\\s+")[0];
 
         int atIndex = command.indexOf('@');
 
@@ -37,28 +37,12 @@ public class TelegramCommandHandler {
 
         command = command.toLowerCase();
 
-        switch (command) {
-            case "/start":
-                return helpHandler.getStartMessage();
+        TelegramCommand handler = commands.get(command);
 
-            case "/help":
-                return helpHandler.getHelpMessage();
-
-            case "/all":
-                return restaurantHandler.getAllRestaurantsMessage();
-
-            case "/filters":
-            case "/cuisine":
-            case "/dish":
-            case "/price":
-            case "/search":
-            case "/reset":
-            case "/cancel":
-                return filterHandler.handleMessage(chatId, text);
-
-            default:
-                // Обычный текст может быть ответом на вопрос фильтра.
-                return filterHandler.handleMessage(chatId, text);
+        if (handler != null) {
+            return handler.execute(chatId, text);
         }
+
+        return filterHandler.handleMessage(chatId, text);
     }
 }

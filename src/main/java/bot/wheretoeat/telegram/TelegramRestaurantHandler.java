@@ -5,6 +5,7 @@ import bot.wheretoeat.model.Restaurant;
 import bot.wheretoeat.service.RestaurantService;
 
 import java.util.List;
+import bot.wheretoeat.service.commands.FindAllRestaurantsCommand;
 
 public class TelegramRestaurantHandler {
 
@@ -17,7 +18,7 @@ public class TelegramRestaurantHandler {
     }
 
     public String getAllRestaurantsMessage() {
-        return formatRestaurants(service.findAll(), "Список заведений");
+        return formatRestaurants(new FindAllRestaurantsCommand(service).execute(), "Список заведений");
     }
 
     public String formatRestaurants(

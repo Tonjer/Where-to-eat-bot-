@@ -1,6 +1,7 @@
 package bot.wheretoeat.ui.commands;
 
-public class ExitCommand implements Command {
+
+public class ExitCommand implements ConsoleCommand {
 
     @Override
     public void execute() {

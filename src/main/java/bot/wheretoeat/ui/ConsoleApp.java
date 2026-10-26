@@ -2,11 +2,8 @@
 package bot.wheretoeat.ui;
 
 import bot.wheretoeat.service.RestaurantService;
-import bot.wheretoeat.ui.commands.Command;
-import bot.wheretoeat.ui.commands.ExitCommand;
-import bot.wheretoeat.ui.commands.FilterCommand;
-import bot.wheretoeat.ui.commands.HelpCommand;
-import bot.wheretoeat.ui.commands.NotImplementedCommand;
+import bot.wheretoeat.service.commands.Command;
+import bot.wheretoeat.ui.commands.*;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -14,7 +11,7 @@ import java.util.Map;
 public class ConsoleApp {
 
     private final MenuPrinter menuPrinter = new MenuPrinter();
-    private final Map<String, Command> commands = new HashMap<>();
+    private final Map<String, ConsoleCommand> commands = new HashMap<>();
 
     public ConsoleApp(RestaurantService service) {
         commands.put("1", new FilterCommand(service, menuPrinter));
@@ -38,7 +35,7 @@ public class ConsoleApp {
                 continue;
             }
 
-            Command command = commands.get(input.toLowerCase());
+            ConsoleCommand command = commands.get(input.toLowerCase());
 
             if (command == null) {
                 System.out.println(
