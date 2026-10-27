@@ -1,5 +1,5 @@
 package bot.wheretoeat.ui.commands;
 
-public interface Command {
+public interface ConsoleCommand {
     void execute();
 }

@@ -1,19 +1,22 @@
+
 package bot.wheretoeat.ui;
 
+import bot.wheretoeat.filter.CompositeFilter;
+import bot.wheretoeat.filter.CuisineFilter;
+import bot.wheretoeat.filter.DishFilter;
+import bot.wheretoeat.filter.Filter;
+import bot.wheretoeat.filter.PriceFilter;
 import bot.wheretoeat.model.Restaurant;
-import bot.wheretoeat.service.CompositeFilter;
-import bot.wheretoeat.service.CuisineFilter;
-import bot.wheretoeat.service.DishFilter;
-import bot.wheretoeat.service.Filter;
-import bot.wheretoeat.service.PriceFilter;
-import bot.wheretoeat.service.RestaurantRepository;
+import bot.wheretoeat.service.RestaurantService;
+import bot.wheretoeat.service.commands.GetAllCuisinesCommand;
+import bot.wheretoeat.service.commands.GetAllDishesCommand;
+import bot.wheretoeat.service.commands.FindRestaurantsByFilterCommand;
 
-import java.util.ArrayList;
 import java.util.List;
 
 public class FilterMenu {
 
-    private final RestaurantRepository repository;
+    private final RestaurantService service;
     private final MenuPrinter printer;
 
     private String dish = null;
@@ -21,8 +24,11 @@ public class FilterMenu {
     private int minCheck = 0;
     private int maxCheck = 0;
 
-    public FilterMenu(RestaurantRepository repository, MenuPrinter printer) {
-        this.repository = repository;
+    public FilterMenu(
+            RestaurantService service,
+            MenuPrinter printer
+    ) {
+        this.service = service;
         this.printer = printer;
     }
 
@@ -51,8 +57,9 @@ public class FilterMenu {
     }
 
     private void chooseDish() {
-        List<String> dishes = repository.getAllDishes();
+        List<String> dishes = new GetAllDishesCommand(service).execute();
         int choice = chooseFromList(dishes, "🍽 Выберите тип еды");
+
         if (choice > 0) {
             dish = dishes.get(choice - 1);
             showResults();
@@ -60,8 +67,9 @@ public class FilterMenu {
     }
 
     private void chooseCuisine() {
-        List<String> cuisines = repository.getAllCuisines();
+        List<String> cuisines = new GetAllCuisinesCommand(service).execute();
         int choice = chooseFromList(cuisines, "🌍 Выберите кухню");
+
         if (choice > 0) {
             cuisine = cuisines.get(choice - 1);
             showResults();
@@ -72,10 +80,12 @@ public class FilterMenu {
         printer.printPriceMenu();
 
         String input = ConsoleReader.readLine();
+
         if (input.equals("5")) {
             chooseCustomPrice();
             return;
         }
+
         switch (input) {
             case "1":
                 minCheck = 0;
@@ -106,33 +116,53 @@ public class FilterMenu {
     }
 
     private void chooseCustomPrice() {
-        printer.printPrompt("Введите диапазон (например 600-1200, 'до 900' или 'от 1000'): ");
-        String input = ConsoleReader.readLine().toLowerCase().replace("₽", "");
+        printer.printPrompt(
+                "Введите диапазон (например 600-1200, 'до 900' или 'от 1000'): "
+        );
+
+        String input = ConsoleReader.readLine()
+                .toLowerCase()
+                .replace("₽", "");
 
         try {
             if (input.startsWith("до")) {
                 minCheck = 0;
                 maxCheck = Integer.parseInt(input.substring(2).trim());
+
             } else if (input.startsWith("от")) {
                 minCheck = Integer.parseInt(input.substring(2).trim());
                 maxCheck = 0;
+
             } else {
                 String[] parts = input.split("-");
+
                 if (parts.length == 2) {
                     minCheck = Integer.parseInt(parts[0].trim());
                     maxCheck = Integer.parseInt(parts[1].trim());
                 } else {
-                    printer.printError("Не понял формат. Примеры: 600-1200, до 900, от 1000.");
+                    printer.printError(
+                            "Не понял формат. Примеры: 600-1200, до 900, от 1000."
+                    );
                     return;
                 }
             }
+
+            if (minCheck < 0 || maxCheck < 0) {
+                printer.printError("Цена не может быть отрицательной.");
+                return;
+            }
+
             if (minCheck > 0 && maxCheck > 0 && minCheck > maxCheck) {
                 printer.printError("Минимальная цена больше максимальной.");
                 return;
             }
+
             showResults();
+
         } catch (NumberFormatException e) {
-            printer.printError("Нужно ввести числа. Примеры: 600-1200, до 900, от 1000.");
+            printer.printError(
+                    "Нужно ввести числа. Примеры: 600-1200, до 900, от 1000."
+            );
         }
     }
 
@@ -140,17 +170,24 @@ public class FilterMenu {
         printer.printFilterMenu(values, title);
 
         String input = ConsoleReader.readLine();
+
         try {
             int choice = Integer.parseInt(input);
+
             if (choice == 0) {
                 show();
                 return 0;
             }
+
             if (choice < 1 || choice > values.size()) {
-                printer.printError("Число вне диапазона. Попробуйте ещё раз.");
+                printer.printError(
+                        "Число вне диапазона. Попробуйте ещё раз."
+                );
                 return 0;
             }
+
             return choice;
+
         } catch (NumberFormatException e) {
             printer.printError("Нужно ввести число.");
             return 0;
@@ -163,20 +200,28 @@ public class FilterMenu {
                 new CuisineFilter(cuisine),
                 new PriceFilter(minCheck, maxCheck)
         );
-        List<Restaurant> found = repository.findByFilter(filter);
+
+        List<Restaurant> found = new FindRestaurantsByFilterCommand(service, filter).execute();
 
         printer.printResultsHeader();
         printCurrentFilters();
+
         if (found.isEmpty()) {
             printer.printNoResults();
         } else {
             printer.printResults(found);
         }
+
         show();
     }
 
     private void printCurrentFilters() {
-        printer.printCurrentFilters(dish, cuisine, minCheck, maxCheck);
+        printer.printCurrentFilters(
+                dish,
+                cuisine,
+                minCheck,
+                maxCheck
+        );
     }
 
     private void reset() {
@@ -184,6 +229,7 @@ public class FilterMenu {
         cuisine = null;
         minCheck = 0;
         maxCheck = 0;
+
         System.out.println("🧹 Все фильтры сброшены.");
     }
 }

@@ -1,6 +1,8 @@
 package bot.wheretoeat.ui.commands;
 
-public class HelpCommand implements Command {
+import bot.wheretoeat.service.commands.Command;
+
+public class HelpCommand implements ConsoleCommand {
 
     @Override
     public void execute() {
