@@ -3,6 +3,9 @@ package bot.wheretoeat.telegram;
 import bot.wheretoeat.repository.RestaurantRepository;
 import bot.wheretoeat.repository.RestaurantRepositoryImpl;
 import bot.wheretoeat.service.RestaurantService;
+import bot.wheretoeat.repository.ReviewRepository;
+import bot.wheretoeat.repository.ReviewRepositoryImpl;
+import bot.wheretoeat.service.ReviewService;
 
 import org.telegram.telegrambots.meta.TelegramBotsApi;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
@@ -11,6 +14,9 @@ import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
 import org.telegram.telegrambots.meta.api.objects.commands.BotCommand;
 
 import java.util.List;
+import java.util.Arrays;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 public class TelegramMain {
 
@@ -34,6 +40,12 @@ public class TelegramMain {
             RestaurantService service =
                     new RestaurantService(repository);
 
+            ReviewRepository reviewRepository =
+                    new ReviewRepositoryImpl();
+
+            ReviewService reviewService =
+                    new ReviewService(reviewRepository, repository);
+
             TelegramHelpHandler helpHandler =
                     new TelegramHelpHandler();
 
@@ -43,11 +55,32 @@ public class TelegramMain {
             TelegramFilterHandler filterHandler =
                     new TelegramFilterHandler(service, restaurantHandler);
 
+            TelegramReviewHandler reviewHandler =
+                    new TelegramReviewHandler(reviewService, service);
+
+            String adminIdsValue = System.getenv("TELEGRAM_ADMIN_IDS");
+
+            if (adminIdsValue == null || adminIdsValue.isBlank()) {
+                throw new RuntimeException("Не задана переменная окружения TELEGRAM_ADMIN_IDS");
+            }
+            Set<Long> adminIds = Arrays.stream(adminIdsValue.split(",")).map(String::trim).map(Long::parseLong).collect(Collectors.toSet());
+
+            if (adminIds.size() != 2) {
+                throw new RuntimeException(
+                        "Необходимо указать ID ровно двух администраторов"
+                );
+            }
+
+            TelegramAdminHandler adminHandler =
+                    new TelegramAdminHandler(reviewService, adminIds);
+
             TelegramCommandHandler commandHandler =
                     new TelegramCommandHandler(
                             helpHandler,
                             restaurantHandler,
-                            filterHandler
+                            filterHandler,
+                            reviewHandler,
+                            adminHandler
                     );
 
             TelegramBot bot = new TelegramBot(
@@ -70,8 +103,11 @@ public class TelegramMain {
                     new BotCommand("dish", "Выбрать блюдо"),
                     new BotCommand("price", "Выбрать средний чек"),
                     new BotCommand("search", "Найти рестораны"),
+                    new BotCommand("reviews", "Отзывы о ресторане"),
+                    new BotCommand("write_review", "Написать отзыв"),
                     new BotCommand("reset", "Сбросить фильтры"),
-                    new BotCommand("cancel", "Отменить выбор")
+                    new BotCommand("cancel", "Отменить выбор"),
+                    new BotCommand("admin", "Панель администратора")
             ));
             bot.execute(setMyCommands);
             System.out.println("Telegram-бот запущен.");

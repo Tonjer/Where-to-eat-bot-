@@ -92,7 +92,7 @@ public class ReviewService {
     }
 
     // Одобрение отзыва
-    public void approveReview(String reviewId) {
+    public synchronized boolean approveReview(String reviewId) {
         Review review = reviewRepository.findById(reviewId);
 
         if (review == null) {
@@ -100,13 +100,16 @@ public class ReviewService {
                     "Отзыв не найден"
             );
         }
-
+        if (review.getStatus() != ReviewStatus.PENDING){
+            return false;
+        }
         review.setStatus(ReviewStatus.APPROVED);
         reviewRepository.update(review);
+        return true;
     }
 
     // Отклонение отзыва
-    public void rejectReview(String reviewId) {
+    public synchronized boolean rejectReview(String reviewId) {
         Review review = reviewRepository.findById(reviewId);
 
         if (review == null) {
@@ -114,9 +117,12 @@ public class ReviewService {
                     "Отзыв не найден"
             );
         }
-
+        if (review.getStatus() != ReviewStatus.PENDING){
+            return false;
+        }
         review.setStatus(ReviewStatus.REJECTED);
         reviewRepository.update(review);
+        return true;
     }
 
     // Расчёт средней оценки ресторана
