@@ -23,6 +23,11 @@ public class TelegramFilterHandler {
 
     // Состояние фильтров отдельно для каждого чата.
     private final Map<Long, FilterState> states = new HashMap<>();
+    private final Map<Long, List<Restaurant>> lastSearchResults = new HashMap<>();
+
+    public List<Restaurant> getLastSearchResults(long chatId) {
+        return lastSearchResults.getOrDefault(chatId, List.of());
+    }
 
     public TelegramFilterHandler(
             RestaurantService service,
@@ -91,7 +96,7 @@ public class TelegramFilterHandler {
 
         if (input.equalsIgnoreCase("/search")) {
             state.pendingAction = "";
-            return search(state);
+            return search(chatId, state);
         }
 
         if (state.pendingAction.equals("cuisine")) {
@@ -243,27 +248,25 @@ public class TelegramFilterHandler {
         }
     }
 
-    private String search(FilterState state) {
-        Filter filter = new CompositeFilter(
-                new DishFilter(state.dish),
-                new CuisineFilter(state.cuisine),
-                new PriceFilter(state.minCheck, state.maxCheck)
-        );
+    private String search(long chatId, FilterState state) {
+        Filter filter = new CompositeFilter(new DishFilter(state.dish), new CuisineFilter(state.cuisine), new PriceFilter(state.minCheck, state.maxCheck));
 
         List<Restaurant> found = new FindRestaurantsByFilterCommand(service, filter).execute();
 
-        String resultMessage = restaurantHandler.formatRestaurants(
-                found,
-                "Результаты поиска\n" + describeFilters(state)
-        );
+        lastSearchResults.put(chatId, List.copyOf(found));
 
-        return resultMessage + """
+        if (found.isEmpty()) {
+            return "По заданным условиям заведений не найдено.\n\n"
+                    + "Что будем делать дальше?\n"
+                    + "/filters — вернуться к меню фильтров";
+        }
 
-
-            Что будем делать дальше?
-            
-            /filters — вернуться к меню фильтров
-            """;
+        return "🔎 Результаты поиска\n"
+                + describeFilters(state)
+                + "\n\nНайдено заведений: " + found.size()
+                + "\n\nНиже — найденные рестораны. "
+                + "У каждого можно оставить отзыв.\n\n"
+                + "/filters — вернуться к меню фильтров";
     }
 
     private String describeFilters(FilterState state) {
