@@ -37,6 +37,8 @@ public class TelegramFilterHandler {
         this.restaurantHandler = restaurantHandler;
     }
 
+    // TODO(refactor P1): После общего разбора команды не сравнивать повторно исходный text с /command.
+    // Использовать общую пользовательскую сессию; не держать отдельные states/lastSearchResults.
     public String handleMessage(long chatId, String text) {
         String input = text == null ? "" : text.trim();
 
@@ -205,6 +207,8 @@ public class TelegramFilterHandler {
         }
     }
 
+    // TODO(refactor P2): Выделить небольшой парсер диапазона: сначала полностью проверить ввод,
+    // затем менять фильтры. Отличать отсутствие границы от 0; неверный диапазон не сохранять.
     private String setPrice(FilterState state, String input) {
         String value = input.toLowerCase().replace("₽", "").trim();
 
@@ -281,6 +285,8 @@ public class TelegramFilterHandler {
                 + (state.maxCheck > 0 ? " до " + state.maxCheck : ""));
     }
 
+    // TODO(refactor P2): Удалить этот неиспользуемый overload и зависимость restaurantHandler;
+    // в основном меню показывать текущие фильтры через существующий describeFilters.
     private String getMenu(FilterState state, boolean unused) {
         return getMenu(state);
     }

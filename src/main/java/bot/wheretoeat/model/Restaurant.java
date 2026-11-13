@@ -9,6 +9,8 @@ public class Restaurant {
     private String name;
     private String address;
     private String cuisine;
+    // TODO(refactor P2): Инициализировать dishes пустым списком также при пустом конструкторе;
+    // не отдавать изменяемый внутренний список. Отсутствующее поле JSON сейчас оставляет null.
     private List<String> dishes;
     private int averageCheck;
 

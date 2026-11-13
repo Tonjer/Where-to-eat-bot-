@@ -8,7 +8,7 @@ import bot.wheretoeat.ui.commands.*;
 import java.util.HashMap;
 import java.util.Map;
 
-public class ConsoleApp {
+public class ConsoleApp { // TODO от консольной реализации разрешаю полностью избавиться
 
     private final MenuPrinter menuPrinter = new MenuPrinter();
     private final Map<String, ConsoleCommand> commands = new HashMap<>();

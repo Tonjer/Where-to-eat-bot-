@@ -14,8 +14,11 @@ public class ReviewRepositoryImpl implements ReviewRepository {
 
     private final List<Review> reviews;
     private final ObjectMapper mapper;
-    private final File file;
+    private final File file; // TODO Есть вариант: если тяжко с файлами работать, то можно сделать InMemoryRepository
+    // Всё хранить в List<Review> и не работать с файлами. Но это на ваше усмотрение, возможно, нет смысла, можно сразу к БД переходить
 
+    // TODO(refactor P2): Принимать путь данных через конструктор (из конфигурации), чтобы файловые
+    // проверки использовали временную директорию. Для этого этапа оставить JSON, без обязательного переезда на БД.
     public ReviewRepositoryImpl() {
         mapper = new ObjectMapper();
 
@@ -25,7 +28,7 @@ public class ReviewRepositoryImpl implements ReviewRepository {
             throw new RuntimeException("Не удалось создать папку data");
         }
 
-        file = new File(dataDirectory, "reviews.json");
+        file = new File(dataDirectory, "reviews.json"); //
 
         reviews = loadReviews();
     }
@@ -36,6 +39,8 @@ public class ReviewRepositoryImpl implements ReviewRepository {
     }
 
     @Override
+    // TODO(refactor P1): Не отдавать внутренние изменяемые Review через findById/findAll: возвращать копии
+    // либо сделать Review неизменяемым. Иначе сервис меняет хранилище в обход успешного update.
     public Review findById(String id) {
         return reviews.stream()
                 .filter(review -> review.getId().equals(id))
@@ -100,6 +105,9 @@ public class ReviewRepositoryImpl implements ReviewRepository {
         }
     }
 
+    // TODO(refactor P1): save/update должны сначала писать новый снимок во временный файл рядом с основным,
+    // затем атомарно заменять основной и только после успеха обновлять память. Синхронизировать весь цикл
+    // для одного процесса; при отказе оставлять прежние данные, повреждённый JSON не затирать пустым.
     private void saveReviews() {
         try {
             mapper.writerWithDefaultPrettyPrinter()

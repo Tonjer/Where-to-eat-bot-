@@ -7,7 +7,7 @@ import java.util.List;
 
 public interface ReviewRepository {
 
-    // Получить все отзывы
+    // Получить все отзывы TODO javadoc вместо комментария
     List<Review> findAll();
 
     // Найти отзыв по его ID

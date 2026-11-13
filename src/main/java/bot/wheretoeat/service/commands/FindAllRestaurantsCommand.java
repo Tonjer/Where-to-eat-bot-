@@ -6,7 +6,7 @@ import bot.wheretoeat.service.RestaurantService;
 import java.util.List;
 
 public class FindAllRestaurantsCommand implements Command<List<Restaurant>> {
-    private final RestaurantService service;
+    private final RestaurantService service; // TODO перенос строки, чтобы отделить конструктор от полей класса
     public FindAllRestaurantsCommand(RestaurantService service){
         this.service = service;
     }

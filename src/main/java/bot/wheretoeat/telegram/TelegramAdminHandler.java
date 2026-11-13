@@ -103,6 +103,8 @@ public class TelegramAdminHandler {
         return reviewService.getPendingReviews();
     }
 
+    // TODO(refactor P1): Сохранить проверку adminIds и для команд, и для callback при объединении роутера.
+    // Правила перехода статуса оставить в ReviewService; ошибки записи возвращать как понятный отказ.
     public String handleCallback(long userId, String callbackData) {
         if (!isAdmin(userId)) {
             return "У тебя нет доступа к модерации.";

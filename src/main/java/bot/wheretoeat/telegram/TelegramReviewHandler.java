@@ -29,8 +29,12 @@ public class TelegramReviewHandler {
         }
     }
 
+    // TODO(refactor P1): Перейти на общую сессию из TelegramCommandHandler; чужой пользователь чата
+    // не должен продолжать/отменять отзыв. Вместо rating == 0 использовать шаги REVIEW_RATING и REVIEW_TEXT.
     private final Map<Long, ReviewSession> sessions = new HashMap<>();
 
+    // TODO(refactor P2): Показывать отзывы страницами; добавить кнопку просмотра в карточку ресторана,
+    // чтобы пользователю не приходилось угадывать ID. Среднее считать без повторной загрузки списка.
     public String handleReviewsCommand(String text) {
         String[] parts = text.trim().split("\\s+");
 
@@ -93,6 +97,8 @@ public class TelegramReviewHandler {
         return "Ты собираешься оставить отзыв о ресторане " + restaurant.getName() + ".\n\n" + "Поставь оценку от 1 до 5.";
     }
 
+    // TODO(refactor P1): Оставить здесь шаги диалога и разбор ввода; правила отзыва держать в ReviewService.
+    // При ошибке записи сохранять черновик. Убрать обещание уведомления после модерации, пока его нет.
     public String handleIncomingMessage(long chatId, long userId, String username, String text) {
         ReviewSession session = sessions.get(chatId);
         if (session == null) {

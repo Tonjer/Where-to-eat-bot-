@@ -13,6 +13,8 @@ public class TelegramCommandHandler {
     private final TelegramFilterHandler filterHandler;
     private final TelegramReviewHandler reviewHandler;
     private final TelegramAdminHandler adminHandler;
+    // TODO(refactor P1): Объединить состояния фильтров, отзыва и поиска в UserSession по (chatId, userId).
+    // Один активный шаг (enum), общая отмена и срок жизни; переходы одной сессии выполнять последовательно.
     private final Map<Long, Long> searchOwners = new HashMap<>();
 
     public TelegramCommandHandler(TelegramHelpHandler helpHandler, TelegramRestaurantHandler restaurantHandler, TelegramFilterHandler filterHandler, TelegramReviewHandler reviewHandler, TelegramAdminHandler adminHandler) {
@@ -56,6 +58,9 @@ public class TelegramCommandHandler {
         commands.put("/cancel", filterHandler::handleMessage);
     }
 
+    // TODO(refactor P1): Разбирать команду один раз: имя, аргументы и @адресат; чужого бота игнорировать.
+    // Передавать разобранную команду и автора обработчикам, включая админские команды и /cancel.
+    // Зафиксировать приоритет /help, /cancel и правила смены сценария во время написания отзыва.
     public String handleMessage(long chatId, long userId, String username, String text) {
         if (text == null || text.isBlank()) {
             return "Напиши /help для просмотра команд.";

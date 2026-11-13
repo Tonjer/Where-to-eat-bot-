@@ -14,15 +14,14 @@ public class ReviewService {
     private final ReviewRepository reviewRepository;
     private final RestaurantRepository restaurantRepository;
 
-    public ReviewService(
-            ReviewRepository reviewRepository,
-            RestaurantRepository restaurantRepository
-    ) {
+    public ReviewService(ReviewRepository reviewRepository, RestaurantRepository restaurantRepository) {
         this.reviewRepository = reviewRepository;
         this.restaurantRepository = restaurantRepository;
     }
 
-    // Добавление нового отзыва
+    // Добавление нового отзыва TODO если нужны комментарии к методам, то пишите javadoc
+    // TODO(refactor P1): Задать единый предел длины текста и проверять его здесь для любого интерфейса.
+    // Ресторан получать через findById; проверки оценки/текста и начальный PENDING оставить в сервисе.
     public void addReview(
             String restaurantId,
             long telegramUserId,
@@ -31,7 +30,7 @@ public class ReviewService {
             String text
     ) {
         if (rating < 1 || rating > 5) {
-            throw new IllegalArgumentException(
+            throw new IllegalArgumentException( // TODO можно и в одну строку, макс длина строки до 140 символов это база
                     "Оценка должна быть от 1 до 5"
             );
         }
@@ -92,6 +91,9 @@ public class ReviewService {
     }
 
     // Одобрение отзыва
+    // TODO(refactor P1): Не менять объект репозитория до успешной записи: сохранять копию с новым статусом.
+    // Объединить approve/reject приватным методом, сохранив проверку PENDING и общий порядок записи.
+    // Проверить: отказ записи не меняет статус, повторное решение не выполняется второй раз.
     public synchronized boolean approveReview(String reviewId) {
         Review review = reviewRepository.findById(reviewId);
 

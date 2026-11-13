@@ -7,8 +7,12 @@ import bot.wheretoeat.repository.RestaurantRepository;
 
 import java.util.List;
 
-public class RestaurantService {
+public class RestaurantService { // TODO у вас этот класс все действия делегирует репозиторию. Он полностью повторяет методы
+    // репозитория. Если так происходит, значит, вы создали дубликат и бесполезный класс.
+    // В идеале у вас в сервисе должна быть логика
 
+    // TODO(refactor P2): Сохранить конкретный сервис как точку поиска; общие правила не переносить в Telegram-handler.
+    // Не добавлять интерфейс сервиса, базовые классы и новые обёртки ради формального разделения слоёв.
     private final RestaurantRepository repository;
 
     public RestaurantService(RestaurantRepository repository) {

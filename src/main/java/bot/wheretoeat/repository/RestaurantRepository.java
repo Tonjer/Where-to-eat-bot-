@@ -7,6 +7,8 @@ import java.util.List;
 
 public interface RestaurantRepository {
 
+    // TODO(refactor P2): Добавить findById и использовать в ReviewService/TelegramReviewHandler
+    // вместо повторяющихся findAll().stream(); существующие интерфейсы хранилищ сохранить.
     List<Restaurant> findAll();
 
     List<Restaurant> findByFilter(Filter filter);
@@ -14,4 +16,6 @@ public interface RestaurantRepository {
     List<String> getAllCuisines();
 
     List<String> getAllDishes();
+
+    // TODO сохранение через админа в тг
 }

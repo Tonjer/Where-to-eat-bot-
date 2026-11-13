@@ -32,6 +32,9 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 
     @Override
+    // TODO(refactor P1): Получать от обработчика единый результат (сообщения, кнопки, ответ callback).
+    // Убрать отдельные ветки /pending и отправку /search по исходному тексту: они обходят маршрутизацию
+    // и отправляют старые результаты, даже когда активный отзыв заблокировал поиск.
     public void onUpdateReceived(Update update) {
         if (update == null) {
             return;
@@ -150,6 +153,8 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
+    // TODO(refactor P1): Проверять наличие message/data и ловить ошибки обработки на границе update
+    // (для сообщений тоже); сообщать о сбое и подтверждать callback даже при ошибке хранилища.
     private void handleCallback(Update update) {
         var callback = update.getCallbackQuery();
 

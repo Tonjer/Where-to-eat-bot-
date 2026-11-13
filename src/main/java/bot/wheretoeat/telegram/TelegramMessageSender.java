@@ -27,6 +27,9 @@ public class TelegramMessageSender {
         message.setReplyMarkup(keyboard);
         executeMessage(message);
     }
+    // TODO(refactor P1): Общая проверка/разбиение длинных сообщений с сохранением привязки кнопок;
+    // возвращать результат отправки вместо одного printStackTrace. Ошибка доставки не должна
+    // повторно запускать бизнес-операцию. Обрабатывать временные ограничения API в этом классе.
     private void executeMessage(SendMessage message) {
         try {
             bot.execute(message);
