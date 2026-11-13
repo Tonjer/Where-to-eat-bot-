@@ -44,3 +44,5 @@ private/
 .DS_Store
 Thumbs.db
 out/
+
+data/reviews.json
