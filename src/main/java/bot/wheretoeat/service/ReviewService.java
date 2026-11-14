@@ -71,34 +71,25 @@ public class ReviewService {
                 .collect(Collectors.toList());
     }
 
-    // TODO(refactor P1): Не менять объект репозитория до успешной записи: сохранять копию с новым статусом.
-    // Объединить approve/reject приватным методом, сохранив проверку PENDING и общий порядок записи.
-    // Проверить: отказ записи не меняет статус, повторное решение не выполняется второй раз.
     public synchronized boolean approveReview(String reviewId) {
-        Review review = reviewRepository.findById(reviewId);
-
-        if (review == null) {
-            throw new IllegalArgumentException("Отзыв не найден");
-        }
-        if (review.getStatus() != ReviewStatus.PENDING) {
-            return false;
-        }
-        review.setStatus(ReviewStatus.APPROVED);
-        reviewRepository.update(review);
-        return true;
+        return changePendingReviewStatus(reviewId, ReviewStatus.APPROVED);
     }
 
     public synchronized boolean rejectReview(String reviewId) {
-        Review review = reviewRepository.findById(reviewId);
+        return changePendingReviewStatus(reviewId, ReviewStatus.REJECTED);
+    }
 
+    private boolean changePendingReviewStatus(String reviewId, ReviewStatus targetStatus) {
+        Review review = reviewRepository.findById(reviewId);
         if (review == null) {
             throw new IllegalArgumentException("Отзыв не найден");
         }
         if (review.getStatus() != ReviewStatus.PENDING) {
             return false;
         }
-        review.setStatus(ReviewStatus.REJECTED);
-        reviewRepository.update(review);
+
+        Review updatedCopy = review.copyWithStatus(targetStatus);
+        reviewRepository.update(updatedCopy);
         return true;
     }
 
