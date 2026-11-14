@@ -11,6 +11,8 @@ import java.util.stream.Collectors;
 
 public class ReviewService {
 
+    public static final int MAX_REVIEW_TEXT_LENGTH = 1000;
+
     private final ReviewRepository reviewRepository;
     private final RestaurantRepository restaurantRepository;
 
@@ -19,8 +21,6 @@ public class ReviewService {
         this.restaurantRepository = restaurantRepository;
     }
 
-    // TODO(refactor P1): Задать единый предел длины текста и проверять его здесь для любого интерфейса.
-    // Ресторан получать через findById; проверки оценки/текста и начальный PENDING оставить в сервисе.
     public void addReview(
             String restaurantId,
             long telegramUserId,
@@ -36,23 +36,24 @@ public class ReviewService {
             throw new IllegalArgumentException("Текст отзыва не может быть пустым");
         }
 
-        boolean restaurantExists = restaurantRepository.findAll().stream()
-                .anyMatch(restaurant -> restaurant.getId().equals(restaurantId));
-
-        if (!restaurantExists) {
+        String trimmedText = text.trim();
+        if (trimmedText.length() > MAX_REVIEW_TEXT_LENGTH) {
+            throw new IllegalArgumentException("Текст отзыва не может превышать " + MAX_REVIEW_TEXT_LENGTH + " символов");
+        }
+        if (restaurantId == null || restaurantRepository.findById(restaurantId) == null) {
             throw new IllegalArgumentException("Ресторан не найден");
         }
 
-        Review review = new Review();
-
-        review.setId(UUID.randomUUID().toString());
-        review.setRestaurantId(restaurantId);
-        review.setTelegramUserId(telegramUserId);
-        review.setUsername(username);
-        review.setRating(rating);
-        review.setText(text);
-        review.setStatus(ReviewStatus.PENDING);
-        review.setCreatedAt(System.currentTimeMillis());
+        Review review = new Review(
+                UUID.randomUUID().toString(),
+                restaurantId,
+                telegramUserId,
+                username,
+                rating,
+                trimmedText,
+                ReviewStatus.PENDING,
+                System.currentTimeMillis()
+        );
 
         reviewRepository.save(review);
     }
@@ -79,7 +80,7 @@ public class ReviewService {
         if (review == null) {
             throw new IllegalArgumentException("Отзыв не найден");
         }
-        if (review.getStatus() != ReviewStatus.PENDING){
+        if (review.getStatus() != ReviewStatus.PENDING) {
             return false;
         }
         review.setStatus(ReviewStatus.APPROVED);
@@ -93,7 +94,7 @@ public class ReviewService {
         if (review == null) {
             throw new IllegalArgumentException("Отзыв не найден");
         }
-        if (review.getStatus() != ReviewStatus.PENDING){
+        if (review.getStatus() != ReviewStatus.PENDING) {
             return false;
         }
         review.setStatus(ReviewStatus.REJECTED);
