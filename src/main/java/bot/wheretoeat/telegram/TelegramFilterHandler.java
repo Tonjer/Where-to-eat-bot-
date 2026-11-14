@@ -253,9 +253,7 @@ public class TelegramFilterHandler {
     }
 
     private String search(long chatId, FilterState state) {
-        Filter filter = new CompositeFilter(new DishFilter(state.dish), new CuisineFilter(state.cuisine), new PriceFilter(state.minCheck, state.maxCheck));
-
-        List<Restaurant> found = new FindRestaurantsByFilterCommand(service, filter).execute();
+        List<Restaurant> found = service.search(state.cuisine, state.dish, state.minCheck, state.maxCheck);
 
         lastSearchResults.put(chatId, List.copyOf(found));
 

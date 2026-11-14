@@ -1,18 +1,28 @@
 package bot.wheretoeat.telegram;
 
+import bot.wheretoeat.model.Restaurant;
 import bot.wheretoeat.model.Review;
+import bot.wheretoeat.service.RestaurantService;
 import bot.wheretoeat.service.ReviewService;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 
 public class TelegramAdminHandler {
 
     private final ReviewService reviewService;
+    private final RestaurantService restaurantService;
     private final Set<Long> adminIds;
+    ;
 
     public TelegramAdminHandler(ReviewService reviewService, Set<Long> adminIds) {
+        this(reviewService, null, adminIds);
+    }
+
+    public TelegramAdminHandler(ReviewService reviewService, RestaurantService restaurantService, Set<Long> adminIds) {
         this.reviewService = reviewService;
+        this.restaurantService = restaurantService;
         this.adminIds = adminIds;
     }
 
@@ -21,10 +31,14 @@ public class TelegramAdminHandler {
     }
 
     public String handleAdminCommand(long chatId, long userId, String text) {
-        String[] parts = text.trim().split("\\s+");
+        String[] parts = text.trim().split("\\s+", 2);
         String command = parts[0].split("@")[0].toLowerCase();
 
-        if (!command.equals("/admin") && !command.equals("/pending") && !command.equals("/approve") && !command.equals("/reject")) {
+        if (!command.equals("/admin")
+                && !command.equals("/pending")
+                && !command.equals("/approve")
+                && !command.equals("/reject")
+                && !command.equals("/add_restaurant")) {
             return null;
         }
 
@@ -40,25 +54,59 @@ public class TelegramAdminHandler {
                         /pending — новые отзывы
                         /approve ID — одобрить отзыв
                         /reject ID — отклонить отзыв
+                        /add_restaurant Название | Адрес | Кухня | Блюдо1, Блюдо2 | СреднийЧек — добавить ресторан
                         """;
 
             case "/pending":
                 return getPendingReviewsMessage();
 
             case "/approve":
-                if (parts.length < 2) {
+                if (parts.length < 2 || parts[1].isBlank()) {
                     return "Укажи ID отзыва: /approve ID";
                 }
-                return approveReview(parts[1]);
+                return approveReview(parts[1].trim());
 
             case "/reject":
-                if (parts.length < 2) {
+                if (parts.length < 2 || parts[1].isBlank()) {
                     return "Укажи ID отзыва: /reject ID";
                 }
-                return rejectReview(parts[1]);
+                return rejectReview(parts[1].trim());
+
+            case "/add_restaurant":
+                if (parts.length < 2 || parts[1].isBlank()) {
+                    return "Формат: /add_restaurant Название | Адрес | Кухня | Блюдо1, Блюдо2 | СреднийЧек";
+                }
+                return addRestaurant(parts[1]);
 
             default:
                 return null;
+        }
+    }
+
+    private String addRestaurant(String rawArgs) {
+        if (restaurantService == null) {
+            return "Сервис ресторанов не настроен.";
+        }
+        String[] fields = rawArgs.split("\\|");
+        if (fields.length != 5) {
+            return "Неверный формат. Используй: /add_restaurant Название | Адрес | Кухня | Блюдо1, Блюдо2 | СреднийЧек";
+        }
+        try {
+            String name = fields[0].trim();
+            String address = fields[1].trim();
+            String cuisine = fields[2].trim();
+            List<String> dishes = Arrays.stream(fields[3].split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .toList();
+            int averageCheck = Integer.parseInt(fields[4].trim());
+
+            Restaurant saved = restaurantService.addRestaurant(name, address, cuisine, dishes, averageCheck);
+            return "✅ Ресторан добавлен! ID: " + saved.getId();
+        } catch (NumberFormatException e) {
+            return "Средний чек должен быть числом.";
+        } catch (IllegalArgumentException e) {
+            return "Ошибка: " + e.getMessage();
         }
     }
 

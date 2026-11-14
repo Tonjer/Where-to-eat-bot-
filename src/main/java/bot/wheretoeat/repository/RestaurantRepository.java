@@ -17,5 +17,5 @@ public interface RestaurantRepository {
 
     List<String> getAllDishes();
 
-    // TODO сохранение через админа в тг
+    void save(Restaurant restaurant);
 }

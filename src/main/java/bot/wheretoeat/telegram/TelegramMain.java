@@ -1,10 +1,7 @@
 package bot.wheretoeat.telegram;
 
-import bot.wheretoeat.repository.RestaurantRepository;
-import bot.wheretoeat.repository.InFileRestarauntRepositry;
+import bot.wheretoeat.repository.*;
 import bot.wheretoeat.service.RestaurantService;
-import bot.wheretoeat.repository.ReviewRepository;
-import bot.wheretoeat.repository.InFileReviewRepository;
 import bot.wheretoeat.service.ReviewService;
 
 import org.telegram.telegrambots.meta.TelegramBotsApi;
@@ -37,7 +34,7 @@ public class TelegramMain {
 
         try {
             RestaurantRepository repository =
-                    new InFileRestarauntRepositry();
+                    new InFileRestaurantRepository();
 
             RestaurantService service =
                     new RestaurantService(repository);
@@ -74,7 +71,7 @@ public class TelegramMain {
             }
 
             TelegramAdminHandler adminHandler =
-                    new TelegramAdminHandler(reviewService, adminIds);
+                    new TelegramAdminHandler(reviewService, service, adminIds);
 
             TelegramCommandHandler commandHandler =
                     new TelegramCommandHandler(
