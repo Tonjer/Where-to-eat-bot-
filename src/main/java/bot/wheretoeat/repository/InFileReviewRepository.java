@@ -7,8 +7,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class InFileReviewRepository implements ReviewRepository {
 
@@ -33,14 +38,17 @@ public class InFileReviewRepository implements ReviewRepository {
     }
 
     @Override
-    public List<Review> findAll() {
-        return new ArrayList<>(reviews);
+    public synchronized List<Review> findAll() {
+        return reviews.stream()
+                .map(Review::copy)
+                .collect(Collectors.toList());
     }
 
     @Override
-    // TODO(refactor P1): Не отдавать внутренние изменяемые Review через findById/findAll: возвращать копии
-    // либо сделать Review неизменяемым. Иначе сервис меняет хранилище в обход успешного update.
-    public Review findById(String id) {
+    public synchronized Review findById(String id) {
+        if (id == null) {
+            return null;
+        }
         return reviews.stream()
                 .filter(review -> review.getId().equals(id))
                 .findFirst()
@@ -48,7 +56,7 @@ public class InFileReviewRepository implements ReviewRepository {
     }
 
     @Override
-    public void save(Review review) {
+    public synchronized void save(Review review) {
         if (review == null) {
             throw new IllegalArgumentException("Отзыв не может быть null");
         }
@@ -57,62 +65,86 @@ public class InFileReviewRepository implements ReviewRepository {
             throw new IllegalArgumentException("Такой отзыв уже существует");
         }
 
-        reviews.add(review);
-        saveReviews();
+        List<Review> nextSnapshot = new ArrayList<>(reviews.size() + 1);
+        for (Review existing : reviews) {
+            nextSnapshot.add(existing.copy());
+        }
+        nextSnapshot.add(review.copy());
+
+        writeSnapshotAtomically(nextSnapshot);
+
+        reviews.clear();
+        reviews.addAll(nextSnapshot);
     }
 
     @Override
-    public void update(Review review) {
+    public synchronized void update(Review review) {
         if (review == null) {
             throw new IllegalArgumentException("Отзыв не может быть null");
         }
 
+        int index = -1;
         for (int i = 0; i < reviews.size(); i++) {
             if (reviews.get(i).getId().equals(review.getId())) {
-                reviews.set(i, review);
-                saveReviews();
-                return;
+                index = i;
+                break;
             }
         }
+        if (index < 0) {
+            throw new IllegalArgumentException("Отзыв не найден");
+        }
 
-        throw new IllegalArgumentException("Отзыв не найден");
+        List<Review> nextSnapshot = new ArrayList<>(reviews.size());
+        for (int i = 0; i < reviews.size(); i++) {
+            if (i == index) {
+                nextSnapshot.add(review.copy());
+            } else {
+                nextSnapshot.add(reviews.get(i).copy());
+            }
+        }
+        writeSnapshotAtomically(nextSnapshot);
+
+        reviews.clear();
+        reviews.addAll(nextSnapshot);
     }
 
     private List<Review> loadReviews() {
         try {
             if (!file.exists()) {
-                saveEmptyFile();
+                writeSnapshotAtomically(new ArrayList<>());
                 return new ArrayList<>();
             }
-
-            return mapper.readValue(
-                    file,
-                    new TypeReference<List<Review>>() {
-                    }
-            );
+            List<Review> loaded = mapper.readValue(file, new TypeReference<List<Review>>() {
+            });
+            if (loaded == null) {
+                throw new RuntimeException("Повреждён файл отзывов: содержимое равно null");
+            }
+            return loaded.stream().map(Review::copy).collect(Collectors.toList());
 
         } catch (IOException e) {
-            throw new RuntimeException("Ошибка при загрузке отзывов", e);
+            throw new RuntimeException("Ошибка при загрузке отзывов (повреждённый файл не перезаписан)", e);
         }
     }
 
-    private void saveEmptyFile() {
+    private void writeSnapshotAtomically(List<Review> snapshot) {
+        Path targetPath = file.toPath();
+        Path parentDir = targetPath.getParent() != null ? targetPath.getParent() : Path.of(".");
+        Path tempFile = null;
         try {
-            mapper.writerWithDefaultPrettyPrinter()
-                    .writeValue(file, new ArrayList<Review>());
+            tempFile = Files.createTempFile(parentDir, file.getName() + ".", ".tmp");
+            mapper.writerWithDefaultPrettyPrinter().writeValue(tempFile.toFile(), snapshot);
+            try {
+                Files.move(tempFile, targetPath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            } catch (AtomicMoveNotSupportedException e) {
+                Files.move(tempFile, targetPath, StandardCopyOption.REPLACE_EXISTING);
+            }
         } catch (IOException e) {
-            throw new RuntimeException("Не удалось создать reviews.json", e);
-        }
-    }
-
-    // TODO(refactor P1): save/update должны сначала писать новый снимок во временный файл рядом с основным,
-    // затем атомарно заменять основной и только после успеха обновлять память. Синхронизировать весь цикл
-    // для одного процесса; при отказе оставлять прежние данные, повреждённый JSON не затирать пустым.
-    private void saveReviews() {
-        try {
-            mapper.writerWithDefaultPrettyPrinter()
-                    .writeValue(file, reviews);
-        } catch (IOException e) {
+            if (tempFile != null) {
+                try {
+                    Files.deleteIfExists(tempFile);
+                } catch (IOException ignored) {
+                }
+            }
             throw new RuntimeException("Ошибка при сохранении отзывов", e);
         }
     }

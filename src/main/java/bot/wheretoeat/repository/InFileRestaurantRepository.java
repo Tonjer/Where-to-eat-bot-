@@ -74,6 +74,16 @@ public class InFileRestaurantRepository implements RestaurantRepository {
         saveRestaurantsToFile();
     }
 
+    @Override
+    public synchronized Restaurant findById(String id){
+        if (id == null){
+            return null;
+        }
+        return restaurants.stream()
+                .filter(r -> id.equals(r.getId()))
+                .findFirst()
+                .orElse(null);
+    }
     // TODO(refactor P2): После чтения проверять обязательные поля, уникальность ID, dishes и неотрицательный чек;
     // выдавать понятную ошибку загрузки, а не NPE при первом поиске.
     private List<Restaurant> loadRestaurants() {

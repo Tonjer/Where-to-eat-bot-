@@ -13,6 +13,8 @@ public interface RestaurantRepository {
 
     List<Restaurant> findByFilter(Filter filter);
 
+    Restaurant findById(String id);
+
     List<String> getAllCuisines();
 
     List<String> getAllDishes();
