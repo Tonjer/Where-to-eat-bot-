@@ -12,16 +12,14 @@ import java.util.List;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 
-public class RestaurantRepositoryImpl implements RestaurantRepository { // TODO давайте нормально называть реализации?
-    // Impl - моветон, он ни о чём не говорит. Почему бы не назвать InMemoryRestaurantRepository? Звучит приятнее и понятно,
-    // что это репозиторий в памяти, а не БД, можно так же InFileRestarauntRepositry и в таком духе названия (мб и лучше, у вас ведь тут из файла загрузка).
-    // Аналогично с ReviewRepository.
+public class InFileRestarauntRepositry implements RestaurantRepository {
 
     private final List<Restaurant> restaurants;
 
-    public RestaurantRepositoryImpl() {
+    public InFileRestarauntRepositry() {
         restaurants = loadRestaurants();
-    } // TODO отделять методы строкой, либо нажимать почаще Ctrl + Alt + L для автоформатирования
+    }
+
     @Override
     public List<Restaurant> findAll() {
         return new ArrayList<>(restaurants);
@@ -29,11 +27,9 @@ public class RestaurantRepositoryImpl implements RestaurantRepository { // TODO 
 
     @Override
     public List<Restaurant> findByFilter(Filter filter) {
-        return restaurants.stream().filter(filter::matches).collect(Collectors.toList()); // TODO после stream() принято переносить всё на новую строку:
-        //типа restaraunts.stream()
-        //  .filter(...)
-        //  .collect(...);
-        // это добавляет читаемости
+        return restaurants.stream()
+                .filter(filter::matches)
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -46,6 +42,7 @@ public class RestaurantRepositoryImpl implements RestaurantRepository { // TODO 
         }
         return new ArrayList<>(cuisines);
     }
+
     @Override
     public List<String> getAllDishes() {
         TreeSet<String> dishes = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);

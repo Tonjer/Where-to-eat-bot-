@@ -19,7 +19,6 @@ public class ReviewService {
         this.restaurantRepository = restaurantRepository;
     }
 
-    // Добавление нового отзыва TODO если нужны комментарии к методам, то пишите javadoc
     // TODO(refactor P1): Задать единый предел длины текста и проверять его здесь для любого интерфейса.
     // Ресторан получать через findById; проверки оценки/текста и начальный PENDING оставить в сервисе.
     public void addReview(
@@ -30,27 +29,18 @@ public class ReviewService {
             String text
     ) {
         if (rating < 1 || rating > 5) {
-            throw new IllegalArgumentException( // TODO можно и в одну строку, макс длина строки до 140 символов это база
-                    "Оценка должна быть от 1 до 5"
-            );
+            throw new IllegalArgumentException("Оценка должна быть от 1 до 5");
         }
 
         if (text == null || text.trim().isEmpty()) {
-            throw new IllegalArgumentException(
-                    "Текст отзыва не может быть пустым"
-            );
+            throw new IllegalArgumentException("Текст отзыва не может быть пустым");
         }
 
-        boolean restaurantExists = restaurantRepository.findAll()
-                .stream()
-                .anyMatch(restaurant ->
-                        restaurant.getId().equals(restaurantId)
-                );
+        boolean restaurantExists = restaurantRepository.findAll().stream()
+                .anyMatch(restaurant -> restaurant.getId().equals(restaurantId));
 
         if (!restaurantExists) {
-            throw new IllegalArgumentException(
-                    "Ресторан не найден"
-            );
+            throw new IllegalArgumentException("Ресторан не найден");
         }
 
         Review review = new Review();
@@ -67,30 +57,19 @@ public class ReviewService {
         reviewRepository.save(review);
     }
 
-    // Получение одобренных отзывов конкретного ресторана
     public List<Review> getApprovedReviews(String restaurantId) {
-        return reviewRepository.findAll()
-                .stream()
-                .filter(review ->
-                        review.getRestaurantId().equals(restaurantId)
-                )
-                .filter(review ->
-                        review.getStatus() == ReviewStatus.APPROVED
-                )
+        return reviewRepository.findAll().stream()
+                .filter(review -> review.getRestaurantId().equals(restaurantId))
+                .filter(review -> review.getStatus() == ReviewStatus.APPROVED)
                 .collect(Collectors.toList());
     }
 
-    // Получение отзывов, ожидающих модерации
     public List<Review> getPendingReviews() {
-        return reviewRepository.findAll()
-                .stream()
-                .filter(review ->
-                        review.getStatus() == ReviewStatus.PENDING
-                )
+        return reviewRepository.findAll().stream()
+                .filter(review -> review.getStatus() == ReviewStatus.PENDING)
                 .collect(Collectors.toList());
     }
 
-    // Одобрение отзыва
     // TODO(refactor P1): Не менять объект репозитория до успешной записи: сохранять копию с новым статусом.
     // Объединить approve/reject приватным методом, сохранив проверку PENDING и общий порядок записи.
     // Проверить: отказ записи не меняет статус, повторное решение не выполняется второй раз.
@@ -98,9 +77,7 @@ public class ReviewService {
         Review review = reviewRepository.findById(reviewId);
 
         if (review == null) {
-            throw new IllegalArgumentException(
-                    "Отзыв не найден"
-            );
+            throw new IllegalArgumentException("Отзыв не найден");
         }
         if (review.getStatus() != ReviewStatus.PENDING){
             return false;
@@ -110,14 +87,11 @@ public class ReviewService {
         return true;
     }
 
-    // Отклонение отзыва
     public synchronized boolean rejectReview(String reviewId) {
         Review review = reviewRepository.findById(reviewId);
 
         if (review == null) {
-            throw new IllegalArgumentException(
-                    "Отзыв не найден"
-            );
+            throw new IllegalArgumentException("Отзыв не найден");
         }
         if (review.getStatus() != ReviewStatus.PENDING){
             return false;
@@ -127,7 +101,6 @@ public class ReviewService {
         return true;
     }
 
-    // Расчёт средней оценки ресторана
     public double getAverageRating(String restaurantId) {
         List<Review> reviews = getApprovedReviews(restaurantId);
 
