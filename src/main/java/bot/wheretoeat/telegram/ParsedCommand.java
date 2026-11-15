@@ -18,7 +18,7 @@ public class ParsedCommand {
 
     public static ParsedCommand parse(String text) {
         String trimmed = text == null ? "" : text.trim();
-        if (trimmed.isEmpty() || trimmed.startsWith("/")) {
+        if (trimmed.isEmpty() || !trimmed.startsWith("/")) {
             return new ParsedCommand(trimmed, null, null, trimmed);
         }
         String[] parts = trimmed.split("\\s+", 2);
