@@ -1,17 +1,10 @@
 package bot.wheretoeat.telegram;
 
-import bot.wheretoeat.model.Restaurant;
-import bot.wheretoeat.model.Review;
-
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
+import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
+import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
-import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
-
-import java.util.ArrayList;
-import java.util.List;
 
 public class TelegramBot extends TelegramLongPollingBot {
 
@@ -32,9 +25,6 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 
     @Override
-    // TODO(refactor P1): Получать от обработчика единый результат (сообщения, кнопки, ответ callback).
-    // Убрать отдельные ветки /pending и отправку /search по исходному тексту: они обходят маршрутизацию
-    // и отправляют старые результаты, даже когда активный отзыв заблокировал поиск.
     public void onUpdateReceived(Update update) {
         if (update == null) {
             return;
@@ -49,142 +39,87 @@ public class TelegramBot extends TelegramLongPollingBot {
             return;
         }
 
-        long chatId = update.getMessage().getChatId();
-        long userId = update.getMessage().getFrom().getId();
+        Message message = update.getMessage();
+        if (message.getFrom() == null) {
+            return;
+        }
 
-        String username = update.getMessage().getFrom().getUserName();
+        long chatId = message.getChatId();
+        long userId = message.getFrom().getId();
+
+        String username = message.getFrom().getUserName();
 
         if (username == null || username.isBlank()) {
-            username = update.getMessage().getFrom().getFirstName();
+            username = message.getFrom().getFirstName();
         }
 
-        String text = update.getMessage().getText().trim();
+        String text = message.getText().trim();
 
-        if (text.equalsIgnoreCase("/pending")) {
-            sendPendingReviews(chatId, userId);
-            return;
-        }
-
-        String answer = commandHandler.handleMessage(
-                chatId, userId, username, text
-        );
-
-        if (answer != null && !answer.isBlank()) {
-            messageSender.sendMessage(chatId, answer);
-        }
-
-        if (text.equalsIgnoreCase("/search")) {
-            sendSearchResults(chatId);
+        try {
+            BotResponse response = commandHandler.routeMessage(chatId, userId, username, text);
+            sendBotResponseMessages(chatId, response);
+        } catch (Exception e) {
+            System.err.println("Ошибка при обработке сообщения: " + e.getMessage());
+            e.printStackTrace();
+            messageSender.sendMessage(chatId, "Произошла ошибка при обработке запроса. Попробуйте позже.");
         }
     }
 
-    private void sendSearchResults(long chatId) {
-        List<Restaurant> restaurants = commandHandler.getLastSearchResults(chatId);
-
-        for (Restaurant restaurant : restaurants) {
-            String text = (restaurants.indexOf(restaurant) + 1)
-                    + ". " + restaurant.getName() + "\n"
-                    + "📍 Адрес: " + restaurant.getAddress() + "\n"
-                    + "🌍 Кухня: " + restaurant.getCuisine() + "\n"
-                    + "🍽 Блюда: " + String.join(", ", restaurant.getDishes()) + "\n"
-                    + "💰 Средний чек: " + restaurant.getAverageCheck() + " ₽";
-
-            InlineKeyboardButton reviewButton = new InlineKeyboardButton("✍️ Оставить отзыв");
-
-            reviewButton.setCallbackData("restaurant_review:" + restaurant.getId());
-
-            List<InlineKeyboardButton> row = new ArrayList<>();
-            row.add(reviewButton);
-
-            List<List<InlineKeyboardButton>> rows = new ArrayList<>();
-            rows.add(row);
-
-            InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
-            keyboard.setKeyboard(rows);
-
-            messageSender.sendMessage(chatId, text, keyboard);
-        }
-    }
-
-    private void sendPendingReviews(long chatId, long userId) {
-        List<Review> reviews = commandHandler.getPendingReviewsForAdmin(userId);
-
-        if (reviews == null) {
-            messageSender.sendMessage(chatId, "У тебя нет доступа к административной панели.");
-            return;
-        }
-
-        if (reviews.isEmpty()) {
-            messageSender.sendMessage(chatId, "Новых отзывов пока нет.");
-            return;
-        }
-
-        for (Review review : reviews) {
-            String username = review.getUsername();
-
-            if (username == null || username.isBlank()) {
-                username = "Пользователь";
-            }
-
-            String text = "📋 Отзыв ожидает модерации\n\n"
-                    + "🆔 ID: " + review.getId() + "\n"
-                    + "🍽 ID ресторана: " + review.getRestaurantId() + "\n"
-                    + "👤 Автор: " + username + "\n"
-                    + "⭐ Оценка: " + review.getRating() + "/5\n"
-                    + "💬 Отзыв: " + review.getText();
-
-            InlineKeyboardButton approveButton = new InlineKeyboardButton("✅ Одобрить");
-            approveButton.setCallbackData("approve:" + review.getId());
-
-            InlineKeyboardButton rejectButton = new InlineKeyboardButton("❌ Отклонить");
-            rejectButton.setCallbackData("reject:" + review.getId());
-
-            List<InlineKeyboardButton> row = new ArrayList<>();
-            row.add(approveButton);
-            row.add(rejectButton);
-
-            List<List<InlineKeyboardButton>> rows = new ArrayList<>();
-            rows.add(row);
-
-            InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
-            keyboard.setKeyboard(rows);
-
-            messageSender.sendMessage(chatId, text, keyboard);
-        }
-    }
-
-    // TODO(refactor P1): Проверять наличие message/data и ловить ошибки обработки на границе update
-    // (для сообщений тоже); сообщать о сбое и подтверждать callback даже при ошибке хранилища.
     private void handleCallback(Update update) {
-        var callback = update.getCallbackQuery();
+        CallbackQuery callback = update.getCallbackQuery();
+        if (callback == null || callback.getFrom() == null) {
+            return;
+        }
 
+        String callbackId = callback.getId();
         long userId = callback.getFrom().getId();
-        long chatId = callback.getMessage().getChatId();
+        Long chatId = callback.getMessage() != null ? callback.getMessage().getChatId() : null;
         String callbackData = callback.getData();
 
-        String answer;
+        if (chatId == null || callbackData == null) {
+            answerCallbackSilently(callbackId, "Некорректные данные кнопки.");
+            return;
+        }
 
-        if (callbackData.startsWith("restaurant_review:")) {
-            String restaurantId = callbackData.substring("restaurant_review:".length());
+        String callbackText = null;
+        try {
+            BotResponse response = commandHandler.routeCallback(chatId, userId, callbackData);
+            callbackText = response.getCallbackAnswer();
+            sendBotResponseMessages(chatId, response);
+        } catch (Exception e) {
+            System.err.println("Ошибка при обработке нажатия кнопки: " + e.getMessage());
+            e.printStackTrace();
+            callbackText = "Произошла ошибка при обработке действия.";
+        } finally {
+            answerCallbackSilently(callbackId, callbackText);
+        }
+    }
 
-            answer = commandHandler.startReviewFromSearch(chatId, userId, restaurantId);
+    private void sendBotResponseMessages(long chatId, BotResponse response) {
+        if (response == null) {
+            return;
+        }
+        for (BotResponse.OutgoingMessage msg : response.getMessages()) {
+            messageSender.sendMessage(chatId, msg.text(), msg.keyboard());
+        }
+    }
 
-            messageSender.sendMessage(chatId, answer);
-
-            answer = "Открываем написание отзыва.";
-        } else {
-            answer = commandHandler.handleAdminCallback(userId, callbackData);
+    private void answerCallbackSilently(String callbackId, String answer) {
+        if (callbackId == null) {
+            return;
         }
 
         AnswerCallbackQuery answerCallback = new AnswerCallbackQuery();
-        answerCallback.setCallbackQueryId(callback.getId());
-        answerCallback.setText(answer);
+        answerCallback.setCallbackQueryId(callbackId);
+        if (answer != null || !answer.isBlank()) {
+            answerCallback.setText(answer);
+        }
         answerCallback.setShowAlert(false);
 
         try {
             execute(answerCallback);
         } catch (Exception e) {
-            System.err.println("Не удалось обработать нажатие кнопки.");
+            System.err.println("Не удалось подтвердить нажатие кнопки.");
             e.printStackTrace();
         }
     }
