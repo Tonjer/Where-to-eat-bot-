@@ -31,7 +31,7 @@ public class UserSession {
     private int reviewRating;
     private String reviewDraftText;
 
-    private void touch(long now) {
+    public void touch(long now) {
         this.updatedAt = now;
     }
 
