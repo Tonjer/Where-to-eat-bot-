@@ -1,10 +1,7 @@
 package bot.wheretoeat.telegram;
 
-import bot.wheretoeat.repository.RestaurantRepository;
-import bot.wheretoeat.repository.RestaurantRepositoryImpl;
+import bot.wheretoeat.repository.*;
 import bot.wheretoeat.service.RestaurantService;
-import bot.wheretoeat.repository.ReviewRepository;
-import bot.wheretoeat.repository.ReviewRepositoryImpl;
 import bot.wheretoeat.service.ReviewService;
 
 import org.telegram.telegrambots.meta.TelegramBotsApi;
@@ -20,6 +17,8 @@ import java.util.stream.Collectors;
 
 public class TelegramMain {
 
+    // TODO(refactor P2): Проверять конфигурацию до создания хранилищ; вынести username и путь данных,
+    // убрать требование ровно двух администраторов. Обновить README для реального запуска Telegram.
     public static void main(String[] args) {
         String botToken = System.getenv("Telegram_Bot_Token");
 
@@ -35,13 +34,13 @@ public class TelegramMain {
 
         try {
             RestaurantRepository repository =
-                    new RestaurantRepositoryImpl();
+                    new InFileRestaurantRepository();
 
             RestaurantService service =
                     new RestaurantService(repository);
 
             ReviewRepository reviewRepository =
-                    new ReviewRepositoryImpl();
+                    new InFileReviewRepository();
 
             ReviewService reviewService =
                     new ReviewService(reviewRepository, repository);
@@ -72,7 +71,7 @@ public class TelegramMain {
             }
 
             TelegramAdminHandler adminHandler =
-                    new TelegramAdminHandler(reviewService, adminIds);
+                    new TelegramAdminHandler(reviewService, service, adminIds);
 
             TelegramCommandHandler commandHandler =
                     new TelegramCommandHandler(
@@ -93,6 +92,8 @@ public class TelegramMain {
 
             botsApi.registerBot(bot);
 
+            // TODO(refactor P2): Хранить имя, описание и доступ команды рядом с её регистрацией;
+            // генерировать меню и /help из одного списка, без внедрения универсального фреймворка команд.
             SetMyCommands setMyCommands = new SetMyCommands();
             setMyCommands.setCommands(List.of(
                     new BotCommand("start", "Запустить бота"),

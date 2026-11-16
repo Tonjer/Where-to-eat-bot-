@@ -1,18 +1,30 @@
 package bot.wheretoeat.telegram;
 
+import bot.wheretoeat.model.Restaurant;
 import bot.wheretoeat.model.Review;
+import bot.wheretoeat.service.RestaurantService;
 import bot.wheretoeat.service.ReviewService;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 
 public class TelegramAdminHandler {
 
     private final ReviewService reviewService;
+    private final RestaurantService restaurantService;
     private final Set<Long> adminIds;
 
     public TelegramAdminHandler(ReviewService reviewService, Set<Long> adminIds) {
+        this(reviewService, null, adminIds);
+    }
+
+    public TelegramAdminHandler(ReviewService reviewService, RestaurantService restaurantService, Set<Long> adminIds) {
         this.reviewService = reviewService;
+        this.restaurantService = restaurantService;
         this.adminIds = adminIds;
     }
 
@@ -20,87 +32,124 @@ public class TelegramAdminHandler {
         return adminIds.contains(userId);
     }
 
-    public String handleAdminCommand(long chatId, long userId, String text) {
-        String[] parts = text.trim().split("\\s+");
-        String command = parts[0].split("@")[0].toLowerCase();
+    public boolean isAdminCommand(String command) {
+        return "/admin".equals(command)
+                || "/pending".equals(command)
+                || "/approve".equals(command)
+                || "/reject".equals(command)
+                || "/add_restaurant".equals(command);
+    }
 
-        if (!command.equals("/admin") && !command.equals("/pending") && !command.equals("/approve") && !command.equals("/reject")) {
+    public BotResponse handleAdminCommand(long userId, ParsedCommand parsed) {
+        String command = parsed.getCommand();
+        if (!isAdminCommand(command)) {
             return null;
         }
 
         if (!isAdmin(userId)) {
-            return "У тебя нет доступа к административной панели.";
+            return BotResponse.ofText("У тебя нет доступа к административной панели.");
         }
+
+        String args = parsed.getArguments();
 
         switch (command) {
             case "/admin":
-                return """
+                return BotResponse.ofText("""
                         🛠 Административная панель
                         
                         /pending — новые отзывы
                         /approve ID — одобрить отзыв
                         /reject ID — отклонить отзыв
-                        """;
+                        /add_restaurant Название | Адрес | Кухня | Блюдо1, Блюдо2 | СреднийЧек — добавить ресторан
+                        """);
 
             case "/pending":
-                return getPendingReviewsMessage();
+                return getPendingReviewsResponse();
 
             case "/approve":
-                if (parts.length < 2) {
-                    return "Укажи ID отзыва: /approve ID";
+                if (args.isEmpty()) {
+                    return BotResponse.ofText("Укажи ID отзыва: /approve ID");
                 }
-                return approveReview(parts[1]);
+                return BotResponse.ofText(approveReview(args.split("\\s+")[0]));
 
             case "/reject":
-                if (parts.length < 2) {
-                    return "Укажи ID отзыва: /reject ID";
+                if (args.isEmpty()) {
+                    return BotResponse.ofText("Укажи ID отзыва: /reject ID");
                 }
-                return rejectReview(parts[1]);
+                return BotResponse.ofText(rejectReview(args.split("\\s+")[0]));
+
+            case "/add_restaurant":
+                if (args.isEmpty()) {
+                    return BotResponse.ofText("Формат: /add_restaurant Название | Адрес | Кухня | Блюдо1, Блюдо2 | СреднийЧек");
+                }
+                return BotResponse.ofText(addRestaurant(args));
 
             default:
                 return null;
         }
     }
 
-    private String getPendingReviewsMessage() {
+    private BotResponse getPendingReviewsResponse() {
         List<Review> reviews = reviewService.getPendingReviews();
 
         if (reviews.isEmpty()) {
-            return "Новых отзывов пока нет.";
+            return BotResponse.ofText("Новых отзывов пока нет.");
         }
 
-        StringBuilder result = new StringBuilder("📋 Отзывы, ожидающие модерации:\n\n");
-
+        List<BotResponse.OutgoingMessage> messages = new ArrayList<>();
         for (Review review : reviews) {
             String username = review.getUsername();
-
             if (username == null || username.isBlank()) {
                 username = "Пользователь";
             }
 
-            result.append("🆔 ID: ").append(review.getId()).append("\n");
+            String text = "📋 Отзыв ожидает модерации\n\n"
+                    + "🆔 ID: " + review.getId() + "\n"
+                    + "🍽 ID ресторана: " + review.getRestaurantId() + "\n"
+                    + "👤 Автор: " + username + "\n"
+                    + "⭐ Оценка: " + review.getRating() + "/5\n"
+                    + "💬 Отзыв: " + review.getText();
 
-            result.append("🍽 ID ресторана: ").append(review.getRestaurantId()).append("\n");
+            InlineKeyboardButton approveButton = new InlineKeyboardButton("✅ Одобрить");
+            approveButton.setCallbackData("approve:" + review.getId());
 
-            result.append("👤 Автор: ").append(username).append("\n");
+            InlineKeyboardButton rejectButton = new InlineKeyboardButton("❌ Отклонить");
+            rejectButton.setCallbackData("reject:" + review.getId());
 
-            result.append("⭐ Оценка: ").append(review.getRating()).append("/5\n");
+            InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+            keyboard.setKeyboard(List.of(List.of(approveButton, rejectButton)));
 
-            result.append("💬 Отзыв: ").append(review.getText()).append("\n");
-
-            result.append("Одобрить: /approve ").append(review.getId()).append("\n");
-
-            result.append("Отклонить: /reject ").append(review.getId()).append("\n\n");
+            messages.add(new BotResponse.OutgoingMessage(text, keyboard));
         }
 
-        return result.toString();
+        return BotResponse.ofMessages(messages);
     }
 
-    public List<Review> getPendingReviewsForAdmin(long userId) {
-        if (!isAdmin(userId)) {
-            return null;
+    private String addRestaurant(String rawArgs) {
+        if (restaurantService == null) {
+            return "Сервис ресторанов не настроен.";
         }
-        return reviewService.getPendingReviews();
+        String[] fields = rawArgs.split("\\|");
+        if (fields.length != 5) {
+            return "Неверный формат. Используй: /add_restaurant Название | Адрес | Кухня | Блюдо1, Блюдо2 | СреднийЧек";
+        }
+        try {
+            String name = fields[0].trim();
+            String address = fields[1].trim();
+            String cuisine = fields[2].trim();
+            List<String> dishes = Arrays.stream(fields[3].split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .toList();
+            int averageCheck = Integer.parseInt(fields[4].trim());
+
+            Restaurant saved = restaurantService.addRestaurant(name, address, cuisine, dishes, averageCheck);
+            return "✅ Ресторан добавлен! ID: " + saved.getId();
+        } catch (NumberFormatException e) {
+            return "Средний чек должен быть числом.";
+        } catch (RuntimeException e) {
+            return "Не удалось добавить ресторан: " + e.getMessage();
+        }
     }
 
     public String handleCallback(long userId, String callbackData) {
@@ -144,6 +193,8 @@ public class TelegramAdminHandler {
 
         } catch (IllegalArgumentException e) {
             return "Не удалось одобрить отзыв: " + e.getMessage();
+        } catch (RuntimeException e) {
+            return "Не удалось сохранить решение по отзыву из-за ошибки хранилища.";
         }
     }
 
@@ -159,6 +210,8 @@ public class TelegramAdminHandler {
 
         } catch (IllegalArgumentException e) {
             return "Не удалось отклонить отзыв: " + e.getMessage();
+        } catch (RuntimeException e) {
+            return "Не удалось сохранить решение по отзыву из-за ошибки хранилища.";
         }
     }
 }
