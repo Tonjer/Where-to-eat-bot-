@@ -29,6 +29,32 @@ public class Review {
         this.createdAt = createdAt;
     }
 
+    public Review copy() {
+        return new Review(
+                this.id,
+                this.restaurantId,
+                this.telegramUserId,
+                this.username,
+                this.rating,
+                this.text,
+                this.status,
+                this.createdAt
+        );
+    }
+
+    public Review copyWithStatus(ReviewStatus newStatus) {
+        return new Review(
+                this.id,
+                this.restaurantId,
+                this.telegramUserId,
+                this.username,
+                this.rating,
+                this.text,
+                newStatus,
+                this.createdAt
+        );
+    }
+
     public String getId() {
         return id;
     }

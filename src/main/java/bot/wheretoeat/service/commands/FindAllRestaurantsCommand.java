@@ -7,12 +7,13 @@ import java.util.List;
 
 public class FindAllRestaurantsCommand implements Command<List<Restaurant>> {
     private final RestaurantService service;
-    public FindAllRestaurantsCommand(RestaurantService service){
+
+    public FindAllRestaurantsCommand(RestaurantService service) {
         this.service = service;
     }
 
     @Override
-    public List<Restaurant> execute(){
+    public List<Restaurant> execute() {
         return service.findAll();
     }
 }

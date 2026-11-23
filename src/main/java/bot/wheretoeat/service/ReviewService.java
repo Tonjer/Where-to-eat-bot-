@@ -11,18 +11,16 @@ import java.util.stream.Collectors;
 
 public class ReviewService {
 
+    public static final int MAX_REVIEW_TEXT_LENGTH = 1000;
+
     private final ReviewRepository reviewRepository;
     private final RestaurantRepository restaurantRepository;
 
-    public ReviewService(
-            ReviewRepository reviewRepository,
-            RestaurantRepository restaurantRepository
-    ) {
+    public ReviewService(ReviewRepository reviewRepository, RestaurantRepository restaurantRepository) {
         this.reviewRepository = reviewRepository;
         this.restaurantRepository = restaurantRepository;
     }
 
-    // Добавление нового отзыва
     public void addReview(
             String restaurantId,
             long telegramUserId,
@@ -31,101 +29,70 @@ public class ReviewService {
             String text
     ) {
         if (rating < 1 || rating > 5) {
-            throw new IllegalArgumentException(
-                    "Оценка должна быть от 1 до 5"
-            );
+            throw new IllegalArgumentException("Оценка должна быть от 1 до 5");
         }
 
         if (text == null || text.trim().isEmpty()) {
-            throw new IllegalArgumentException(
-                    "Текст отзыва не может быть пустым"
-            );
+            throw new IllegalArgumentException("Текст отзыва не может быть пустым");
         }
 
-        boolean restaurantExists = restaurantRepository.findAll()
-                .stream()
-                .anyMatch(restaurant ->
-                        restaurant.getId().equals(restaurantId)
-                );
-
-        if (!restaurantExists) {
-            throw new IllegalArgumentException(
-                    "Ресторан не найден"
-            );
+        String trimmedText = text.trim();
+        if (trimmedText.length() > MAX_REVIEW_TEXT_LENGTH) {
+            throw new IllegalArgumentException("Текст отзыва не может превышать " + MAX_REVIEW_TEXT_LENGTH + " символов");
+        }
+        if (restaurantId == null || restaurantRepository.findById(restaurantId) == null) {
+            throw new IllegalArgumentException("Ресторан не найден");
         }
 
-        Review review = new Review();
-
-        review.setId(UUID.randomUUID().toString());
-        review.setRestaurantId(restaurantId);
-        review.setTelegramUserId(telegramUserId);
-        review.setUsername(username);
-        review.setRating(rating);
-        review.setText(text);
-        review.setStatus(ReviewStatus.PENDING);
-        review.setCreatedAt(System.currentTimeMillis());
+        Review review = new Review(
+                UUID.randomUUID().toString(),
+                restaurantId,
+                telegramUserId,
+                username,
+                rating,
+                trimmedText,
+                ReviewStatus.PENDING,
+                System.currentTimeMillis()
+        );
 
         reviewRepository.save(review);
     }
 
-    // Получение одобренных отзывов конкретного ресторана
     public List<Review> getApprovedReviews(String restaurantId) {
-        return reviewRepository.findAll()
-                .stream()
-                .filter(review ->
-                        review.getRestaurantId().equals(restaurantId)
-                )
-                .filter(review ->
-                        review.getStatus() == ReviewStatus.APPROVED
-                )
+        return reviewRepository.findAll().stream()
+                .filter(review -> review.getRestaurantId().equals(restaurantId))
+                .filter(review -> review.getStatus() == ReviewStatus.APPROVED)
                 .collect(Collectors.toList());
     }
 
-    // Получение отзывов, ожидающих модерации
     public List<Review> getPendingReviews() {
-        return reviewRepository.findAll()
-                .stream()
-                .filter(review ->
-                        review.getStatus() == ReviewStatus.PENDING
-                )
+        return reviewRepository.findAll().stream()
+                .filter(review -> review.getStatus() == ReviewStatus.PENDING)
                 .collect(Collectors.toList());
     }
 
-    // Одобрение отзыва
     public synchronized boolean approveReview(String reviewId) {
-        Review review = reviewRepository.findById(reviewId);
-
-        if (review == null) {
-            throw new IllegalArgumentException(
-                    "Отзыв не найден"
-            );
-        }
-        if (review.getStatus() != ReviewStatus.PENDING){
-            return false;
-        }
-        review.setStatus(ReviewStatus.APPROVED);
-        reviewRepository.update(review);
-        return true;
+        return changePendingReviewStatus(reviewId, ReviewStatus.APPROVED);
     }
 
-    // Отклонение отзыва
     public synchronized boolean rejectReview(String reviewId) {
-        Review review = reviewRepository.findById(reviewId);
+        return changePendingReviewStatus(reviewId, ReviewStatus.REJECTED);
+    }
 
+    private boolean changePendingReviewStatus(String reviewId, ReviewStatus targetStatus) {
+        Review review = reviewRepository.findById(reviewId);
         if (review == null) {
-            throw new IllegalArgumentException(
-                    "Отзыв не найден"
-            );
+            throw new IllegalArgumentException("Отзыв не найден");
         }
-        if (review.getStatus() != ReviewStatus.PENDING){
+        if (review.getStatus() != ReviewStatus.PENDING) {
             return false;
         }
-        review.setStatus(ReviewStatus.REJECTED);
-        reviewRepository.update(review);
+
+        Review updatedCopy = review.copyWithStatus(targetStatus);
+        reviewRepository.update(updatedCopy);
         return true;
     }
 
-    // Расчёт средней оценки ресторана
     public double getAverageRating(String restaurantId) {
         List<Review> reviews = getApprovedReviews(restaurantId);
 

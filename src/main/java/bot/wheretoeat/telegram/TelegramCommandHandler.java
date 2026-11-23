@@ -3,122 +3,152 @@ package bot.wheretoeat.telegram;
 import bot.wheretoeat.model.Restaurant;
 
 import java.util.List;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 public class TelegramCommandHandler {
 
-    private final Map<String, TelegramCommand> commands = new HashMap<>();
+    private static final long SESSION_TTL_MILLIS = TimeUnit.MINUTES.toMillis(30);
 
+    private final TelegramHelpHandler helpHandler;
+    private final TelegramRestaurantHandler restaurantHandler;
     private final TelegramFilterHandler filterHandler;
     private final TelegramReviewHandler reviewHandler;
     private final TelegramAdminHandler adminHandler;
-    private final Map<Long, Long> searchOwners = new HashMap<>();
+    private final String botUsername;
 
-    public TelegramCommandHandler(TelegramHelpHandler helpHandler, TelegramRestaurantHandler restaurantHandler, TelegramFilterHandler filterHandler, TelegramReviewHandler reviewHandler, TelegramAdminHandler adminHandler) {
+    private final Map<UserSession.SessionKey, UserSession> sessions = new ConcurrentHashMap<>();
+
+    public TelegramCommandHandler(
+            TelegramHelpHandler helpHandler,
+            TelegramRestaurantHandler restaurantHandler,
+            TelegramFilterHandler filterHandler,
+            TelegramReviewHandler reviewHandler,
+            TelegramAdminHandler adminHandler
+    ) {
+        this(helpHandler, restaurantHandler, filterHandler, reviewHandler, adminHandler, "Where_ToEat_bot");
+    }
+
+    public TelegramCommandHandler(
+            TelegramHelpHandler helpHandler,
+            TelegramRestaurantHandler restaurantHandler,
+            TelegramFilterHandler filterHandler,
+            TelegramReviewHandler reviewHandler,
+            TelegramAdminHandler adminHandler,
+            String botUsername
+    ) {
+        this.helpHandler = helpHandler;
+        this.restaurantHandler = restaurantHandler;
         this.filterHandler = filterHandler;
         this.reviewHandler = reviewHandler;
         this.adminHandler = adminHandler;
-
-        commands.put(
-                "/start",
-                (chatId, text) -> helpHandler.getStartMessage()
-        );
-
-        commands.put(
-                "/help",
-                (chatId, text) -> helpHandler.getHelpMessage()
-        );
-
-        commands.put(
-                "/all",
-                (chatId, text) ->
-                        restaurantHandler.getAllRestaurantsMessage()
-        );
-
-        commands.put(
-                "/reviews",
-                (chatId, text) ->
-                        reviewHandler.handleReviewsCommand(text)
-        );
-
-        commands.put(
-                "/write_review",
-                reviewHandler::startReview
-        );
-
-        commands.put("/filters", filterHandler::handleMessage);
-        commands.put("/cuisine", filterHandler::handleMessage);
-        commands.put("/dish", filterHandler::handleMessage);
-        commands.put("/price", filterHandler::handleMessage);
-        commands.put("/search", filterHandler::handleMessage);
-        commands.put("/reset", filterHandler::handleMessage);
-        commands.put("/cancel", filterHandler::handleMessage);
+        this.botUsername = botUsername;
     }
 
-    public String handleMessage(long chatId, long userId, String username, String text) {
+    public BotResponse routeMessage(long chatId, long userId, String username, String text) {
         if (text == null || text.isBlank()) {
-            return "Напиши /help для просмотра команд.";
-        }
-        String adminAnswer = adminHandler.handleAdminCommand(chatId, userId, text);
-        if (adminAnswer != null) {
-            return adminAnswer;
+            return BotResponse.ofText("Напиши /help для просмотра команд.");
         }
 
-        String reviewAnswer = reviewHandler.handleIncomingMessage(chatId, userId, username, text);
-
-        if (reviewAnswer != null) {
-            return reviewAnswer;
+        ParsedCommand parsed = ParsedCommand.parse(text);
+        if (parsed.isCommand() && parsed.isAddressedToOtherBot(botUsername)) {
+            return BotResponse.empty();
         }
 
-        String command = text.trim().split("\\s+")[0];
+        UserSession session = getOrCreateSession(chatId, userId);
 
-        int atIndex = command.indexOf('@');
+        synchronized (session) {
+            if (parsed.isCommand()) {
+                String cmd = parsed.getCommand();
+                if ("/help".equals(cmd)) {
+                    return BotResponse.ofText(helpHandler.getHelpMessage());
+                }
+                if ("/cancel".equals(cmd)) {
+                    boolean wasWritingReview = session.isWritingReview();
+                    session.cancelCurrentStep();
+                    return BotResponse.ofText(
+                            wasWritingReview
+                                    ? "Написание отзыва отменено."
+                                    : "Текущий выбор отменён. Напиши /filters."
+                    );
+                }
+            }
 
-        if (atIndex >= 0) {
-            command = command.substring(0, atIndex);
+            if (parsed.isCommand() && adminHandler.isAdminCommand(parsed.getCommand())) {
+                return adminHandler.handleAdminCommand(userId, parsed);
+            }
+
+            if (session.isWritingReview()) {
+                if (parsed.isCommand()) {
+                    return BotResponse.ofText(
+                            "Сначала заверши написание отзыва или напиши /cancel для отмены."
+                    );
+                }
+                return BotResponse.ofText(
+                        reviewHandler.handleReviewStep(session, userId, username, parsed.getRawText())
+                );
+            }
+
+            if (parsed.isCommand()) {
+                return switch (parsed.getCommand()) {
+                    case "/start" -> BotResponse.ofText(helpHandler.getStartMessage());
+                    case "/all" -> BotResponse.ofText(restaurantHandler.getAllRestaurantsMessage());
+                    case "/reviews" -> BotResponse.ofText(reviewHandler.handleReviewsCommand(parsed.getArguments()));
+                    case "/write_review" -> BotResponse.ofText(reviewHandler.startReview(session, parsed.getArguments()));
+                    case "/filters", "/cuisine", "/dish", "/price", "/search", "/reset" ->
+                            filterHandler.handleCommand(session, parsed);
+                    default -> BotResponse.ofText(helpHandler.getUnknownCommandMessage());
+                };
+            }
+
+            return filterHandler.handleStepInput(session, parsed.getRawText());
         }
-
-        command = command.toLowerCase();
-
-        if (command.equals("/search")) {
-            searchOwners.put(chatId, userId);
-        }
-
-        TelegramCommand handler = commands.get(command);
-
-        if (handler != null) {
-            return handler.execute(chatId, text);
-        }
-
-        return filterHandler.handleMessage(chatId, text);
     }
 
-    public java.util.List<bot.wheretoeat.model.Review> getPendingReviewsForAdmin(long userId) {
-        return adminHandler.getPendingReviewsForAdmin(userId);
-    }
-
-    public String handleAdminCallback(long userId, String callbackData) {
-        return adminHandler.handleCallback(userId, callbackData);
-    }
-
-    public List<Restaurant> getLastSearchResults(long chatId) {
-        return filterHandler.getLastSearchResults(chatId);
-    }
-
-    public String startReviewFromSearch(long chatId, long userId, String restaurantId) {
-        Long searchOwner = searchOwners.get(chatId);
-
-        if (searchOwner == null || searchOwner != userId) {
-            return "Сначала выполни поиск ресторанов командой /search.";
+    public BotResponse routeCallback(long chatId, long userId, String callbackData) {
+        if (callbackData == null || callbackData.isBlank()) {
+            return BotResponse.ofCallback("Некорректная команда.");
         }
 
-        boolean restaurantWasFound = filterHandler.getLastSearchResults(chatId).stream().anyMatch(restaurant -> restaurantId.equals(restaurant.getId()));
+        UserSession session = getOrCreateSession(chatId, userId);
 
-        if (!restaurantWasFound) {
-            return "Этот ресторан не найден в твоих последних результатах поиска. Выполни /search ещё раз.";
+        synchronized (session) {
+            if (callbackData.startsWith("restaurant_review:")) {
+                String restaurantId = callbackData.substring("restaurant_review:".length());
+                List<Restaurant> lastResults = session.getLastSearchResults();
+
+                if (lastResults.isEmpty()) {
+                    String msg = "Сначала выполни поиск ресторанов командой /search.";
+                    return BotResponse.ofCallbackAndMessages(msg, List.of(new BotResponse.OutgoingMessage(msg)));
+                }
+
+                boolean restaurantWasFound = lastResults.stream()
+                        .anyMatch(r -> restaurantId.equals(r.getId()));
+                if (!restaurantWasFound) {
+                    String msg = "Этот ресторан не найден в твоих последних результатах поиска. Выполни /search ещё раз.";
+                    return BotResponse.ofCallbackAndMessages(msg, List.of(new BotResponse.OutgoingMessage(msg)));
+                }
+
+                String startText = reviewHandler.startReview(session, restaurantId);
+                return BotResponse.ofCallbackAndMessages(
+                        "Открываем написание отзыва.",
+                        List.of(new BotResponse.OutgoingMessage(startText))
+                );
+            }
+
+            String adminCallbackAnswer = adminHandler.handleCallback(userId, callbackData);
+            return BotResponse.ofCallback(adminCallbackAnswer);
         }
+    }
 
-        return reviewHandler.startReview(chatId, "/write_review " + restaurantId);
+    private UserSession getOrCreateSession(long chatId, long userId) {
+        long now = System.currentTimeMillis();
+        sessions.entrySet().removeIf(entry -> entry.getValue().isExpired(now, SESSION_TTL_MILLIS));
+
+        UserSession.SessionKey key = new UserSession.SessionKey(chatId, userId);
+        UserSession session = sessions.computeIfAbsent(key, k -> new UserSession());
+        session.touch(now);
+        return session;
     }
 }

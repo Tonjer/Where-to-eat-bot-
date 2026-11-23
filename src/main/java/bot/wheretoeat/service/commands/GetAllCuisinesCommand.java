@@ -10,8 +10,9 @@ public class GetAllCuisinesCommand implements Command<List<String>> {
     public GetAllCuisinesCommand(RestaurantService service) {
         this.service = service;
     }
+
     @Override
-    public List<String> execute(){
+    public List<String> execute() {
         return service.getAllCuisines();
     }
 

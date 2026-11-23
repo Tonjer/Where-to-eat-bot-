@@ -21,6 +21,8 @@ public class TelegramRestaurantHandler {
         return formatRestaurants(new FindAllRestaurantsCommand(service).execute(), "Список заведений");
     }
 
+    // TODO(refactor P2): Использовать одно форматирование карточки здесь и в TelegramBot;
+    // заменить обрезание /all и неограниченную отправку /search страницами с доступом к остатку.
     public String formatRestaurants(
             List<Restaurant> restaurants,
             String title
